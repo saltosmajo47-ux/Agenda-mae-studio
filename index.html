@@ -1,0 +1,1394 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Agenda Mae Studio</title>
+  
+  <!-- Supabase JS -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <!-- jsPDF y AutoTable para reportes -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.31/jspdf.plugin.autotable.min.js"></script>
+
+  <style>
+    :root {
+      --bg: #fbf7f5;               
+      --card: #ffffff;             
+      --accent: #e8a5b8;           
+      --accent-hover: #d890a5;     
+      --accent-secondary: #b39ddb; 
+      --text: #4a3e3d;             
+      --text-sub: #8c7b79;         
+      --border: #f0e2de;           
+    }
+
+    body {
+      font-family: system-ui, -apple-system, sans-serif;
+      background-color: var(--bg);
+      color: var(--text);
+      margin: 0;
+      padding: 16px;
+    }
+
+    .container {
+      max-width: 950px;
+      margin: 0 auto;
+    }
+
+    h1 {
+      text-align: center;
+      color: #3b2d2c;
+      margin-bottom: 24px;
+      font-weight: 700;
+      letter-spacing: -0.5px;
+    }
+
+    .card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 20px;
+      margin-bottom: 24px;
+      box-shadow: 0 4px 15px rgba(0, 0, 0, 0.03);
+    }
+
+    .card h3 {
+      margin-top: 0;
+      color: #3b2d2c;
+      border-bottom: 2px solid var(--border);
+      padding-bottom: 8px;
+    }
+
+    /* --- Resumen Estadístico (KPIs) --- */
+    .kpi-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+      gap: 12px;
+      margin-bottom: 8px;
+    }
+
+    .kpi-card {
+      background: #fdfbfb;
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 12px 14px;
+      text-align: center;
+    }
+
+    .kpi-card span {
+      display: block;
+      font-size: 11px;
+      font-weight: 600;
+      color: var(--text-sub);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      margin-bottom: 4px;
+    }
+
+    .kpi-card strong {
+      font-size: 17px;
+      color: #3b2d2c;
+      font-weight: 700;
+    }
+
+    .kpi-card.egreso-card {
+      background: #fff5f5;
+      border-color: #fecdd3;
+    }
+
+    .kpi-card.egreso-card strong {
+      color: #e11d48;
+    }
+
+    .grid-form {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+      gap: 12px;
+    }
+
+    label {
+      display: block;
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--text-sub);
+      margin-bottom: 4px;
+    }
+
+    input, select, textarea {
+      width: 100%;
+      padding: 10px;
+      background: #fdfbfb;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      color: var(--text);
+      box-sizing: border-box;
+      font-size: 14px;
+    }
+
+    input:focus, select:focus, textarea:focus {
+      outline: none;
+      border-color: var(--accent);
+      background: #fff;
+    }
+
+    button {
+      background: var(--accent);
+      color: #fff;
+      font-weight: bold;
+      border: none;
+      padding: 12px 20px;
+      border-radius: 8px;
+      cursor: pointer;
+      width: 100%;
+      margin-top: 12px;
+      transition: all 0.2s;
+    }
+
+    button:hover {
+      background: var(--accent-hover);
+    }
+
+    .btn-cancel {
+      background: #cbd5e1;
+      color: #334155;
+      margin-top: 6px;
+    }
+
+    .btn-cancel:hover {
+      background: #94a3b8;
+    }
+
+    .btn-pdf {
+      background-color: var(--accent-secondary);
+      color: #ffffff;
+    }
+
+    .btn-pdf:hover {
+      background-color: #9575cd;
+    }
+
+    .btn-sec {
+      background-color: #90a4ae;
+      color: #ffffff;
+    }
+
+    .btn-sec:hover {
+      background-color: #78909c;
+    }
+
+    .appointment, .egreso-item {
+      border-left: 5px solid var(--accent);
+      padding: 12px;
+      margin-bottom: 12px;
+      background: #fdfbfb;
+      border-radius: 0 10px 10px 0;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.02);
+      border-top: 1px solid var(--border);
+      border-right: 1px solid var(--border);
+      border-bottom: 1px solid var(--border);
+      transition: all 0.3s ease;
+    }
+
+    .egreso-item {
+      border-left-color: #f43f5e;
+    }
+
+    .appointment.cita-ahora {
+      border-left: 5px solid #ec4899 !important;
+      background: #fdf2f8 !important;
+      animation: pulse-border 2s infinite;
+    }
+
+    .appointment.cita-proxima {
+      border-left: 5px solid #f59e0b !important;
+      background: #fffbeb !important;
+    }
+
+    @keyframes pulse-border {
+      0% { box-shadow: 0 0 0 0 rgba(236, 72, 153, 0.2); }
+      70% { box-shadow: 0 0 0 6px rgba(236, 72, 153, 0); }
+      100% { box-shadow: 0 0 0 0 rgba(236, 72, 153, 0); }
+    }
+
+    .details strong {
+      display: block;
+      font-size: 16px;
+      color: #2b1f1e;
+    }
+
+    .details span {
+      font-size: 13px;
+      color: var(--text-sub);
+    }
+
+    .badge-estado {
+      display: inline-block;
+      padding: 3px 8px;
+      border-radius: 12px;
+      font-size: 11px;
+      font-weight: 700;
+      margin-top: 4px;
+      letter-spacing: 0.2px;
+    }
+
+    .badge-pendiente { background-color: #fef3c7; color: #92400e; }
+    .badge-efectivo { background-color: #d1fae5; color: #065f46; }
+    .badge-transferencia { background-color: #e0e7ff; color: #3730a3; }
+    .badge-tarjeta { background-color: #f3e8ff; color: #6b21a8; }
+    .badge-completado { background-color: #dcfce7; color: #166534; }
+
+    .badge-alerta {
+      display: inline-block;
+      padding: 2px 7px;
+      border-radius: 10px;
+      font-size: 10px;
+      font-weight: 700;
+      margin-left: 6px;
+      text-transform: uppercase;
+    }
+
+    .badge-alerta-ahora { background: #fce7f3; color: #be185d; border: 1px solid #fbcfe8; }
+    .badge-alerta-proxima { background: #fef3c7; color: #b45309; border: 1px solid #fde68a; }
+
+    .actions {
+      display: flex;
+      gap: 6px;
+      flex-direction: column;
+    }
+
+    .btn-edit {
+      background: #fbcfe8;
+      color: #831843;
+      padding: 6px 12px;
+      border-radius: 6px;
+      width: auto;
+      margin: 0;
+      font-size: 12px;
+    }
+
+    .btn-edit:hover { background: #f472b6; color: #fff; }
+
+    .btn-delete {
+      background: #fecdd3;
+      color: #9f1239;
+      padding: 6px 12px;
+      border-radius: 6px;
+      width: auto;
+      margin: 0;
+      font-size: 12px;
+    }
+
+    .btn-delete:hover { background: #fb7185; color: #fff; }
+
+    .filter-container {
+      margin-bottom: 16px;
+      background: #fdfbfb;
+      padding: 14px;
+      border-radius: 12px;
+      border: 1px solid var(--border);
+    }
+
+    #toastContainer {
+      position: fixed;
+      top: 20px;
+      right: 20px;
+      z-index: 9999;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      pointer-events: none;
+    }
+
+    .toast {
+      pointer-events: auto;
+      min-width: 260px;
+      max-width: 340px;
+      padding: 14px 18px;
+      border-radius: 12px;
+      color: #fff;
+      font-size: 13px;
+      font-weight: 600;
+      box-shadow: 0 8px 20px rgba(0, 0, 0, 0.12);
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      opacity: 0;
+      transform: translateX(50px);
+      transition: all 0.3s cubic-bezier(0.68, -0.55, 0.265, 1.55);
+    }
+
+    .toast.show { opacity: 1; transform: translateX(0); }
+    .toast-success { background: #4de3a3; color: #034b2c; border-left: 5px solid #10b981; }
+    .toast-warning { background: #fde047; color: #713f12; border-left: 5px solid #eab308; }
+    .toast-error { background: #fda4af; color: #881337; border-left: 5px solid #f43f5e; }
+    .toast-info { background: var(--accent-secondary); color: #ffffff; border-left: 5px solid #7c3aed; }
+  </style>
+</head>
+<body>
+
+<div id="toastContainer"></div>
+
+<div class="container">
+  <h1>🌸 Agenda Mae Studio</h1>
+
+  <!-- Formulario Citas -->
+  <div class="card">
+    <h3 id="formTitle">Nueva Cita</h3>
+    <form id="appointmentForm" class="grid-form">
+      <input type="hidden" id="editId" value="" />
+      <div>
+        <label>Fecha</label>
+        <input type="date" id="fecha" required />
+      </div>
+      <div>
+        <label>Hora</label>
+        <input type="time" id="hora" required />
+      </div>
+      <div>
+        <label>Cliente</label>
+        <input type="text" id="cliente" placeholder="Nombre completo" required />
+      </div>
+      <div>
+        <label>Especialista / Trabajadora</label>
+        <select id="trabajadora" required>
+          <option value="">Selecciona especialista...</option>
+          <option value="Semira">Semira</option>
+          <option value="Damaris">Damaris</option>
+          <option value="Carolina">Carolina</option>
+          <option value="Anabelle">Anabelle</option>
+          <option value="Génesis">Génesis</option>
+          <option value="Emilia">Emilia</option>
+        </select>
+      </div>
+      <div>
+        <label>Servicio</label>
+        <select id="servicio" required>
+          <option value="">Selecciona servicio...</option>
+          <option value="Manicura">Manicura</option>
+          <option value="Pedicura">Pedicura</option>
+          <option value="Manicura y Pedicura">Manicura y Pedicura</option>
+          <option value="Cejas">Cejas</option>
+          <option value="Pestañas">Pestañas</option>
+          <option value="Depilación">Depilación</option>
+        </select>
+      </div>
+      <div>
+        <label>Monto ($)</label>
+        <input type="number" step="0.01" id="monto" placeholder="0.00" required />
+      </div>
+      <div>
+        <label>Estado / Método de Pago</label>
+        <select id="estado">
+          <option value="Pendiente">Pendiente</option>
+          <option value="Efectivo">Efectivo</option>
+          <option value="Transferencia">Transferencia</option>
+          <option value="Tarjeta">Tarjeta</option>
+          <option value="Completado">Completado</option>
+        </select>
+      </div>
+      
+      <div id="grupoBanco" style="display: none;">
+        <label>Banco de Origen</label>
+        <select id="banco_origen">
+          <option value="">Selecciona banco...</option>
+          <option value="Pichincha">Pichincha</option>
+          <option value="Guayaquil">Guayaquil</option>
+          <option value="Produbanco">Produbanco</option>
+          <option value="Pacífico">Pacífico</option>
+          <option value="Bolivariano">Bolivariano</option>
+          <option value="Otro">Otro</option>
+        </select>
+      </div>
+
+      <div style="grid-column: 1 / -1;">
+        <label>Notas</label>
+        <textarea id="notas" rows="2" placeholder="Detalles adicionales..."></textarea>
+      </div>
+      <div style="grid-column: 1 / -1;">
+        <button type="submit" id="btnSubmit">Guardar Cita</button>
+        <button type="button" id="btnCancelEdit" class="btn-cancel" style="display:none;">Cancelar Edición</button>
+      </div>
+    </form>
+  </div>
+
+  <!-- Lista de citas -->
+  <div class="card">
+    <h3>📋 Cronograma de Citas</h3>
+
+    <div class="filter-container">
+      <div class="grid-form" style="align-items: end;">
+        <div>
+          <label for="filtroFecha">📅 Filtrar por Fecha:</label>
+          <input type="date" id="filtroFecha">
+        </div>
+        <div>
+          <label for="filtroEspecialista">🔍 Filtrar por Especialista:</label>
+          <select id="filtroEspecialista">
+            <option value="TODAS">🌸 Ver todas las especialistas</option>
+            <option value="Semira">Semira</option>
+            <option value="Damaris">Damaris</option>
+            <option value="Carolina">Carolina</option>
+            <option value="Anabelle">Anabelle</option>
+            <option value="Génesis">Génesis</option>
+            <option value="Emilia">Emilia</option>
+          </select>
+        </div>
+        <div>
+          <button type="button" id="btnVerTodosDias" class="btn-sec" style="margin-top:0; padding:10px;">Ver Todos los Días</button>
+        </div>
+      </div>
+    </div>
+
+    <div id="citasList">Cargando citas...</div>
+  </div>
+
+  <!-- Resumen Estadístico (KPIs) -->
+  <div class="card">
+    <h3>📊 Resumen del Día y Totales</h3>
+    <div class="kpi-grid">
+      <div class="kpi-card">
+        <span>Total Turnos</span>
+        <strong id="kpiTurnos">0</strong>
+      </div>
+      <div class="kpi-card">
+        <span>Total Recaudado</span>
+        <strong id="kpiMonto">$0.00</strong>
+      </div>
+      <div class="kpi-card">
+        <span>Neto Studio</span>
+        <strong id="kpiNetoStudio">$0.00</strong>
+      </div>
+      <div class="kpi-card">
+        <span>Efectivo Hoy</span>
+        <strong id="kpiEfectivo">$0.00</strong>
+      </div>
+      <div class="kpi-card">
+        <span>Transf. / Tarjeta</span>
+        <strong id="kpiBancos">$0.00</strong>
+      </div>
+    </div>
+  </div>
+
+  <!-- SECCIÓN DE EGRESOS Y COMPRAS -->
+  <div class="card">
+    <h3>☕ Registro de Egresos y Gastos de Insumos</h3>
+    <form id="egresoForm" class="grid-form">
+      <div>
+        <label>Fecha de Compra</label>
+        <input type="date" id="egresoFecha" required />
+      </div>
+      <div>
+        <label>Categoría / Insumo</label>
+        <select id="egresoCategoria" required>
+          <option value="">Seleccionar insumo...</option>
+          <option value="Agua">💧 Agua</option>
+          <option value="Café">☕ Café</option>
+          <option value="Vasos">🥤 Vasos</option>
+          <option value="Limpieza">🧹 Limpieza</option>
+          <option value="Mantenimiento">🛠️ Mantenimiento</option>
+          <option value="Otro">📦 Otro</option>
+        </select>
+      </div>
+      <div>
+        <label>Cantidad / Unidades</label>
+        <input type="number" id="egresoCantidad" min="1" value="1" placeholder="1" required />
+      </div>
+      <div>
+        <label>Monto / Costo Total ($)</label>
+        <input type="number" step="0.01" id="egresoMonto" placeholder="0.00" required />
+      </div>
+      <div style="grid-column: 1 / -1;">
+        <label>Detalle / Notas de Compra</label>
+        <input type="text" id="egresoNotas" placeholder="Ej: Paquete de vasos biodegradables x100..." />
+      </div>
+      <div style="grid-column: 1 / -1;">
+        <button type="submit" style="background-color: #e11d48;">Registrar Egreso</button>
+      </div>
+    </form>
+
+    <h4 style="margin-top:20px; color:#3b2d2c;">📊 Resumen de Compras / Insumos</h4>
+    <div class="kpi-grid">
+      <div class="kpi-card egreso-card">
+        <span>💧 Compras Agua</span>
+        <strong id="kpiAguaCount">0 veces</strong>
+      </div>
+      <div class="kpi-card egreso-card">
+        <span>☕ Compras Café</span>
+        <strong id="kpiCafeCount">0 veces</strong>
+      </div>
+      <div class="kpi-card egreso-card">
+        <span>🥤 Compras Vasos</span>
+        <strong id="kpiVasosCount">0 veces</strong>
+      </div>
+      <div class="kpi-card egreso-card">
+        <span>💸 Total Gastado</span>
+        <strong id="kpiTotalEgresos">$0.00</strong>
+      </div>
+    </div>
+
+    <h4 style="margin-top:20px; color:#3b2d2c;">📝 Historial de Egresos</h4>
+    <div id="egresosList">Cargando egresos...</div>
+  </div>
+
+  <!-- Descargar Reportes PDF -->
+  <div class="card">
+    <h3>📄 Descargar Reporte PDF</h3>
+    <button class="btn btn-pdf" id="btnPdfHoy">Descargar Turnos de HOY</button>
+    
+    <div style="margin-top: 15px; border-top: 1px solid var(--border); padding-top: 12px;">
+      <label for="fechaPdf">O seleccionar otra fecha / período:</label>
+      <input type="date" id="fechaPdf" style="margin-bottom: 8px;">
+      
+      <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+        <button class="btn btn-sec" id="btnPdfFecha" style="flex: 1; min-width: 140px;">Ver Día Seleccionado</button>
+        <button class="btn btn-pdf" id="btnPdfSemana" style="flex: 1; min-width: 140px;">Reporte SEMANAL</button>
+        <button class="btn btn-pdf" id="btnPdfMes" style="flex: 1; min-width: 140px;">Reporte MENSUAL</button>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+  function obtenerRangoHorarioPermitido(fechaStr) {
+    if (!fechaStr) return { min: "10:00", max: "18:00", texto: "10:00 AM a 6:00 PM" };
+    const partes = fechaStr.split('-');
+    const mes = parseInt(partes[1], 10); 
+
+    if (mes === 11 || mes === 12) {
+      return { min: "08:00", max: "23:00", texto: "8:00 AM a 11:00 PM" };
+    }
+    return { min: "10:00", max: "18:00", texto: "10:00 AM a 6:00 PM" };
+  }
+
+  function actualizarLimitesHorariosInput() {
+    const inputFecha = document.getElementById('fecha');
+    const inputHora = document.getElementById('hora');
+    if (!inputFecha || !inputHora) return;
+
+    const rango = obtenerRangoHorarioPermitido(inputFecha.value);
+    inputHora.min = rango.min;
+    inputHora.max = rango.max;
+  }
+
+  function showToast(mensaje, tipo = 'success') {
+    const container = document.getElementById('toastContainer');
+    const toast = document.createElement('div');
+    toast.className = `toast toast-${tipo}`;
+    
+    let icono = '✨';
+    if (tipo === 'warning') icono = '⚠️';
+    if (tipo === 'error') icono = '❌';
+    if (tipo === 'info') icono = 'ℹ️';
+
+    toast.innerHTML = `<span>${icono}</span> <div>${mensaje}</div>`;
+    container.appendChild(toast);
+
+    playToastSound(tipo);
+
+    setTimeout(() => toast.classList.add('show'), 10);
+
+    setTimeout(() => {
+      toast.classList.remove('show');
+      setTimeout(() => toast.remove(), 300);
+    }, 3500);
+  }
+
+  function playToastSound(tipo) {
+    try {
+      const AudioCtx = window.AudioContext || window.webkitAudioContext;
+      if (!AudioCtx) return;
+      const ctx = new AudioCtx();
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+
+      let freq = 587.33;
+      if (tipo === 'warning') freq = 440;
+      if (tipo === 'error') freq = 220;
+
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(freq, ctx.currentTime);
+      gain.gain.setValueAtTime(0.08, ctx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + 0.3);
+
+      osc.start();
+      osc.stop(ctx.currentTime + 0.3);
+    } catch (e) {}
+  }
+
+  // --- OBTENER PORCENTAJE INDIVIDUAL SEGÚN NOMBRE DE LA CHICA ---
+  function obtenerPorcentajeChica(nombre) {
+    if (!nombre) return 0.47;
+    
+    const nom = String(nombre)
+      .toLowerCase()
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .trim();
+
+    if (nom.includes('semira') || nom.includes('emilia')) {
+      return 1.0;  // 100%
+    }
+    if (nom.includes('carolina')) {
+      return 0.50; // 50%
+    }
+    if (nom.includes('damaris') || nom.includes('genesis') || nom.includes('anabelle') || nom.includes('anabel')) {
+      return 0.47; // 47%
+    }
+
+    return 0.47; // Porcentaje por defecto
+  }
+
+  window.addEventListener('DOMContentLoaded', () => {
+    const SUPABASE_URL = "https://fctlqqmbksifkraozqoq.supabase.co";
+    const SUPABASE_KEY = "sb_publishable_0Tslw5N2dv61HAQmL7igxA_9RrliDTg";
+    
+    if (!window.supabase) {
+      document.getElementById('citasList').innerHTML = '<p style="color:#ef4444">Cargando conexión...</p>';
+      return;
+    }
+
+    const client = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+    const form = document.getElementById('appointmentForm');
+    const egresoForm = document.getElementById('egresoForm');
+    const citasList = document.getElementById('citasList');
+    const egresosList = document.getElementById('egresosList');
+    const btnSubmit = document.getElementById('btnSubmit');
+    const btnCancelEdit = document.getElementById('btnCancelEdit');
+    const formTitle = document.getElementById('formTitle');
+    const editIdInput = document.getElementById('editId');
+    const filtroEspecialista = document.getElementById('filtroEspecialista');
+    const filtroFecha = document.getElementById('filtroFecha');
+    const btnVerTodosDias = document.getElementById('btnVerTodosDias');
+    
+    const estadoSelect = document.getElementById('estado');
+    const grupoBanco = document.getElementById('grupoBanco');
+    const bancoOrigenInput = document.getElementById('banco_origen');
+
+    const hoyStr = new Date().toISOString().split('T')[0];
+    document.getElementById('fecha').value = hoyStr;
+    document.getElementById('egresoFecha').value = hoyStr;
+    document.getElementById('fechaPdf').value = hoyStr;
+    filtroFecha.value = hoyStr;
+
+    actualizarLimitesHorariosInput();
+    document.getElementById('fecha').addEventListener('change', actualizarLimitesHorariosInput);
+
+    let citasGlobales = [];
+    let egresosGlobales = [];
+
+    estadoSelect.addEventListener('change', () => {
+      if (estadoSelect.value === 'Transferencia') {
+        grupoBanco.style.display = 'block';
+      } else {
+        grupoBanco.style.display = 'none';
+        bancoOrigenInput.value = '';
+      }
+    });
+
+    function actualizarResumen() {
+      const fechaFiltro = filtroFecha.value;
+      const especialistaFiltro = filtroEspecialista.value;
+
+      let citasFiltradas = citasGlobales;
+
+      if (fechaFiltro) {
+        citasFiltradas = citasFiltradas.filter(c => c.fecha === fechaFiltro);
+      }
+
+      if (especialistaFiltro !== 'TODAS') {
+        citasFiltradas = citasFiltradas.filter(c => {
+          const trabNom = c.trabajadora || c.Trabajadora || '';
+          return trabNom.toLowerCase() === especialistaFiltro.toLowerCase();
+        });
+      }
+
+      let totalTurnos = citasFiltradas.length;
+      let totalMonto = 0;
+      let totalEfectivo = 0;
+      let totalBancos = 0;
+
+      citasFiltradas.forEach(c => {
+        const monto = parseFloat(c.monto) || 0;
+        totalMonto += monto;
+
+        const st = (c.estado || '').toLowerCase().trim();
+        if (st === 'efectivo') {
+          totalEfectivo += monto;
+        } else if (st === 'transferencia' || st === 'tarjeta') {
+          totalBancos += monto;
+        }
+      });
+
+      document.getElementById('kpiTurnos').innerText = totalTurnos;
+      document.getElementById('kpiMonto').innerText = `$${totalMonto.toFixed(2)}`;
+      document.getElementById('kpiNetoStudio').innerText = `$${totalMonto.toFixed(2)}`;
+      document.getElementById('kpiEfectivo').innerText = `$${totalEfectivo.toFixed(2)}`;
+      document.getElementById('kpiBancos').innerText = `$${totalBancos.toFixed(2)}`;
+    }
+
+    function actualizarResumenEgresos() {
+      let countAgua = 0;
+      let countCafe = 0;
+      let countVasos = 0;
+      let totalGastado = 0;
+
+      egresosGlobales.forEach(e => {
+        const cat = (e.categoria || '').toLowerCase();
+        const monto = parseFloat(e.monto) || 0;
+        totalGastado += monto;
+
+        if (cat.includes('agua')) countAgua++;
+        else if (cat.includes('café') || cat.includes('cafe')) countCafe++;
+        else if (cat.includes('vaso')) countVasos++;
+      });
+
+      document.getElementById('kpiAguaCount').innerText = `${countAgua} veces`;
+      document.getElementById('kpiCafeCount').innerText = `${countCafe} veces`;
+      document.getElementById('kpiVasosCount').innerText = `${countVasos} veces`;
+      document.getElementById('kpiTotalEgresos').innerText = `$${totalGastado.toFixed(2)}`;
+    }
+
+    function renderizarEgresos() {
+      if (egresosGlobales.length === 0) {
+        egresosList.innerHTML = '<p>No hay egresos registrados.</p>';
+        return;
+      }
+
+      const egresosOrdenados = [...egresosGlobales].sort((a, b) => (b.fecha || '').localeCompare(a.fecha || ''));
+
+      egresosList.innerHTML = egresosOrdenados.map(e => `
+        <div class="egreso-item">
+          <div class="details">
+            <strong>${e.categoria || 'Gasto'} (${e.cantidad || 1} uds) - $${parseFloat(e.monto || 0).toFixed(2)}</strong>
+            <span>📅 Fecha: ${e.fecha || ''}</span>
+            ${e.notas ? `<br><small>📝 ${e.notas}</small>` : ''}
+          </div>
+          <div class="actions">
+            <button class="btn-delete" onclick="eliminarEgreso(${e.id})">Eliminar</button>
+          </div>
+        </div>
+      `).join('');
+    }
+
+    function obtenerBadgeEstado(estado, banco) {
+      const est = (estado || 'Pendiente').toLowerCase();
+      let clase = 'badge-pendiente';
+      let texto = estado || 'Pendiente';
+      
+      if (est === 'efectivo') clase = 'badge-efectivo';
+      else if (est === 'transferencia') {
+        clase = 'badge-transferencia';
+        if (banco) texto += ` (${banco})`;
+      }
+      else if (est === 'tarjeta') clase = 'badge-tarjeta';
+      else if (est === 'completado') clase = 'badge-completado';
+
+      return `<span class="badge-estado ${clase}">${texto}</span>`;
+    }
+
+    function obtenerInfoTiempo(fechaStr, horaStr) {
+      if (!fechaStr || !horaStr) return { claseCard: '', badgeAlerta: '' };
+      
+      const ahora = new Date();
+      const actualFechaStr = ahora.toISOString().split('T')[0];
+      
+      if (fechaStr !== actualFechaStr) return { claseCard: '', badgeAlerta: '' };
+
+      const [horas, minutos] = horaStr.split(':').map(Number);
+      const citaDate = new Date(ahora.getFullYear(), ahora.getMonth(), ahora.getDate(), horas, minutos);
+      const diffMinutos = (citaDate - ahora) / (1000 * 60);
+
+      if (diffMinutos >= -45 && diffMinutos <= 15) {
+        return {
+          claseCard: 'cita-ahora',
+          badgeAlerta: '<span class="badge-alerta badge-alerta-ahora">⚡ EN CURSO / AHORA</span>'
+        };
+      }
+      
+      if (diffMinutos > 15 && diffMinutos <= 60) {
+        return {
+          claseCard: 'cita-proxima',
+          badgeAlerta: '<span class="badge-alerta badge-alerta-proxima">⏰ PRÓXIMA (1h)</span>'
+        };
+      }
+
+      return { claseCard: '', badgeAlerta: '' };
+    }
+
+    function renderizarCitas() {
+      const especialistaSeleccionada = filtroEspecialista.value;
+      const fechaSeleccionada = filtroFecha.value;
+
+      let citasFiltradas = citasGlobales;
+
+      if (fechaSeleccionada) {
+        citasFiltradas = citasFiltradas.filter(cita => cita.fecha === fechaSeleccionada);
+      }
+
+      if (especialistaSeleccionada !== 'TODAS') {
+        citasFiltradas = citasFiltradas.filter(cita => {
+          const trabNom = cita.trabajadora || cita.Trabajadora || '';
+          return trabNom.toLowerCase() === especialistaSeleccionada.toLowerCase();
+        });
+      }
+
+      actualizarResumen();
+
+      if (citasFiltradas.length === 0) {
+        let msj = 'No hay citas agendadas';
+        if (fechaSeleccionada) msj += ` para la fecha ${fechaSeleccionada}`;
+        if (especialistaSeleccionada !== 'TODAS') msj += ` (${especialistaSeleccionada})`;
+        citasList.innerHTML = `<p>${msj}.</p>`;
+      } else {
+        const citasOrdenadas = [...citasFiltradas].sort((a, b) => {
+          const compFecha = (a.fecha || '').localeCompare(b.fecha || '');
+          if (compFecha !== 0) return compFecha;
+          return (a.hora || '').localeCompare(b.hora || '');
+        });
+
+        citasList.innerHTML = citasOrdenadas.map(cita => {
+          const clienteNom = cita.cliente || cita.Cliente || 'Cliente';
+          const trabNom = cita.trabajadora || cita.Trabajadora || 'No asignada';
+          const bancoOrg = cita.banco_origen || cita.banco || '';
+          const montoCita = parseFloat(cita.monto || 0);
+          
+          const badgeEstadoHtml = obtenerBadgeEstado(cita.estado, bancoOrg);
+          const { claseCard, badgeAlerta } = obtenerInfoTiempo(cita.fecha, cita.hora);
+
+          return `
+            <div class="appointment ${claseCard}">
+              <div class="details">
+                <strong>${clienteNom} - ${cita.servicio || 'Servicio'} ${badgeAlerta}</strong>
+                <span>💅 Atiende: <b>${trabNom}</b></span><br>
+                <span>📅 ${cita.fecha || ''} | ⏰ ${cita.hora || ''}</span><br>
+                <span>💵 $${montoCita.toFixed(2)} | ${badgeEstadoHtml}</span>
+                ${cita.notas ? `<br><small>📝 ${cita.notas}</small>` : ''}
+              </div>
+              <div class="actions">
+                <button class="btn-edit" onclick="prepararEdicion(${cita.id})">Editar</button>
+                <button class="btn-delete" onclick="eliminarCita(${cita.id})">Eliminar</button>
+              </div>
+            </div>
+          `;
+        }).join('');
+      }
+    }
+
+    async function cargarCitas() {
+      citasList.innerHTML = 'Cargando...';
+      
+      const { data, error } = await client
+        .from('Agenda mae studio')
+        .select('*');
+
+      if (error) {
+        citasList.innerHTML = `<p style="color:#ef4444">Error: ${error.message}</p>`;
+        showToast('Error al conectar con la base de datos', 'error');
+        return;
+      }
+
+      citasGlobales = data || [];
+      renderizarCitas();
+    }
+
+    async function cargarEgresos() {
+      egresosList.innerHTML = 'Cargando...';
+
+      const { data, error } = await client
+        .from('Egresos mae studio')
+        .select('*');
+
+      if (error) {
+        egresosList.innerHTML = `<p style="color:#ef4444">Atención: ${error.message}.</p>`;
+        return;
+      }
+
+      egresosGlobales = data || [];
+      actualizarResumenEgresos();
+      renderizarEgresos();
+    }
+
+    filtroEspecialista.addEventListener('change', renderizarCitas);
+    filtroFecha.addEventListener('change', renderizarCitas);
+    
+    btnVerTodosDias.addEventListener('click', () => {
+      filtroFecha.value = '';
+      renderizarCitas();
+      showToast('Mostrando turnos de todos los días', 'info');
+    });
+
+    setInterval(renderizarCitas, 60000);
+
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      
+      const editId = editIdInput.value;
+      const fecha = document.getElementById('fecha').value;
+      const hora = document.getElementById('hora').value;
+      const trabajadora = document.getElementById('trabajadora').value;
+
+      const rango = obtenerRangoHorarioPermitido(fecha);
+      if (hora < rango.min || hora > rango.max) {
+        showToast(`Horario no permitido. En esta fecha solo atendemos de ${rango.texto}.`, 'warning');
+        return;
+      }
+
+      let query = client
+        .from('Agenda mae studio')
+        .select('id')
+        .eq('fecha', fecha)
+        .eq('hora', hora)
+        .eq('trabajadora', trabajadora);
+
+      if (editId) {
+        query = query.neq('id', editId);
+      }
+
+      const { data: citasExistentes, error: errorCheck } = await query;
+
+      if (errorCheck) {
+        showToast('Error al verificar disponibilidad: ' + errorCheck.message, 'error');
+        return;
+      }
+
+      if (citasExistentes && citasExistentes.length > 0) {
+        showToast(`<b>${trabajadora}</b> ya tiene una cita ocupada el ${fecha} a las ${hora}.`, 'warning');
+        return;
+      }
+
+      const datosCita = {
+        fecha: fecha,
+        hora: hora,
+        cliente: document.getElementById('cliente').value,
+        trabajadora: trabajadora,
+        servicio: document.getElementById('servicio').value,
+        monto: parseFloat(document.getElementById('monto').value) || 0,
+        estado: document.getElementById('estado').value,
+        banco_origen: document.getElementById('banco_origen').value,
+        notas: document.getElementById('notas').value
+      };
+
+      if (editId) {
+        const { error } = await client
+          .from('Agenda mae studio')
+          .update(datosCita)
+          .eq('id', editId);
+
+        if (error) {
+          showToast('Error al actualizar: ' + error.message, 'error');
+        } else {
+          showToast('Cita actualizada exitosamente', 'success');
+          resetearFormulario();
+          cargarCitas();
+        }
+      } else {
+        const { error } = await client
+          .from('Agenda mae studio')
+          .insert([datosCita]);
+
+        if (error) {
+          showToast('Error al guardar: ' + error.message, 'error');
+        } else {
+          showToast('Nueva cita agendada correctamente', 'success');
+          resetearFormulario();
+          cargarCitas();
+        }
+      }
+    });
+
+    egresoForm.addEventListener('submit', async (e) => {
+      e.preventDefault();
+
+      const datosEgreso = {
+        fecha: document.getElementById('egresoFecha').value,
+        categoria: document.getElementById('egresoCategoria').value,
+        cantidad: parseInt(document.getElementById('egresoCantidad').value) || 1,
+        monto: parseFloat(document.getElementById('egresoMonto').value) || 0,
+        notas: document.getElementById('egresoNotas').value
+      };
+
+      const { error } = await client
+        .from('Egresos mae studio')
+        .insert([datosEgreso]);
+
+      if (error) {
+        showToast('Error al guardar egreso: ' + error.message, 'error');
+      } else {
+        showToast('Egreso registrado exitosamente', 'success');
+        egresoForm.reset();
+        document.getElementById('egresoFecha').value = hoyStr;
+        cargarEgresos();
+      }
+    });
+
+    window.prepararEdicion = function(id) {
+      const cita = citasGlobales.find(c => c.id === id);
+      if (!cita) return;
+
+      editIdInput.value = cita.id;
+      document.getElementById('fecha').value = cita.fecha || '';
+      actualizarLimitesHorariosInput();
+      document.getElementById('hora').value = cita.hora || '';
+      document.getElementById('cliente').value = cita.cliente || cita.Cliente || '';
+      document.getElementById('trabajadora').value = cita.trabajadora || cita.Trabajadora || '';
+      document.getElementById('servicio').value = cita.servicio || '';
+      document.getElementById('monto').value = cita.monto || '';
+      
+      const est = cita.estado || 'Pendiente';
+      document.getElementById('estado').value = est;
+      document.getElementById('banco_origen').value = cita.banco_origen || cita.banco || '';
+
+      if (est === 'Transferencia') {
+        grupoBanco.style.display = 'block';
+      } else {
+        grupoBanco.style.display = 'none';
+      }
+
+      document.getElementById('notas').value = cita.notas || '';
+
+      formTitle.innerText = "✏️ Editar Cita";
+      btnSubmit.innerText = "Actualizar Cita";
+      btnCancelEdit.style.display = "block";
+      
+      form.scrollIntoView({ behavior: 'smooth' });
+      showToast('Modo de edición activado', 'info');
+    };
+
+    function resetearFormulario() {
+      form.reset();
+      editIdInput.value = "";
+      document.getElementById('fecha').value = hoyStr;
+      actualizarLimitesHorariosInput();
+      grupoBanco.style.display = 'none';
+      formTitle.innerText = "Nueva Cita";
+      btnSubmit.innerText = "Guardar Cita";
+      btnCancelEdit.style.display = "none";
+    }
+
+    btnCancelEdit.addEventListener('click', () => {
+      resetearFormulario();
+      showToast('Edición cancelada', 'info');
+    });
+
+    window.eliminarCita = async function(id) {
+      if (!confirm('¿Eliminar esta cita?')) return;
+
+      const { error } = await client
+        .from('Agenda mae studio')
+        .delete()
+        .eq('id', id);
+
+      if (error) {
+        showToast('Error al eliminar: ' + error.message, 'error');
+      } else {
+        showToast('Cita eliminada correctamente', 'warning');
+        if (editIdInput.value == id) resetearFormulario();
+        cargarCitas();
+      }
+    };
+
+    window.eliminarEgreso = async function(id) {
+      if (!confirm('¿Eliminar este registro de egreso?')) return;
+
+      const { error } = await client
+        .from('Egresos mae studio')
+        .delete()
+        .eq('id', id);
+
+      if (error) {
+        showToast('Error al eliminar egreso: ' + error.message, 'error');
+      } else {
+        showToast('Egreso eliminado correctamente', 'warning');
+        cargarEgresos();
+      }
+    };
+
+    // --- FUNCIÓN GENERADORA DEL PDF CON PORCENTAJES Y PAGO CHICAS ---
+    function generarPDFGenerico(citasSeleccionadas, egresosSeleccionados, tituloReporte, subtituloPeriodo, nombreArchivo) {
+      if ((!citasSeleccionadas || citasSeleccionadas.length === 0) && (!egresosSeleccionados || egresosSeleccionados.length === 0)) {
+        showToast('No hay datos registrados para el período seleccionado.', 'warning');
+        return;
+      }
+
+      const { jsPDF } = window.jspdf;
+      const doc = new jsPDF();
+
+      // Encabezado Rosado
+      doc.setFillColor(232, 165, 184);
+      doc.rect(0, 0, 210, 30, 'F');
+      
+      doc.setTextColor(255, 255, 255);
+      doc.setFontSize(18);
+      doc.setFont('helvetica', 'bold');
+      doc.text('AGENDA MAE STUDIO', 14, 18);
+
+      doc.setFontSize(11);
+      doc.setFont('helvetica', 'normal');
+      doc.text(tituloReporte, 14, 25);
+      doc.text(subtituloPeriodo, 115, 25);
+
+      let currentY = 35;
+
+      // Agrupar por Especialista
+      const citasPorChica = {};
+      citasSeleccionadas.forEach(c => {
+        const trab = c.trabajadora || c.Trabajadora || c.especialista || 'Sin Asignar';
+        if (!citasPorChica[trab]) citasPorChica[trab] = [];
+        citasPorChica[trab].push(c);
+      });
+
+      const chicas = Object.keys(citasPorChica).sort();
+      let totalAcumuladoPagoChicas = 0; 
+
+      chicas.forEach((chica) => {
+        const citasChica = citasPorChica[chica].sort((a, b) => {
+          const feq = (a.fecha || '').localeCompare(b.fecha || '');
+          if (feq !== 0) return feq;
+          return (a.hora || '').localeCompare(b.hora || '');
+        });
+
+        const totalFacturadoChica = citasChica.reduce((sum, c) => sum + (parseFloat(c.monto) || 0), 0);
+        
+        // Calcular porcentaje individual dinámico
+        const pctChica = obtenerPorcentajeChica(chica);
+        const pagoChica = totalFacturadoChica * pctChica;
+        const pctTexto = Math.round(pctChica * 100);
+
+        totalAcumuladoPagoChicas += pagoChica;
+
+        if (currentY > 230) {
+          doc.addPage();
+          currentY = 20;
+        }
+
+        doc.setFontSize(12);
+        doc.setFont('helvetica', 'bold');
+        doc.setTextColor(59, 45, 44);
+        doc.text(`Especialista: ${chica}`, 14, currentY);
+
+        const tableData = citasChica.map((c, idx) => {
+          const bancoInfo = (c.banco_origen || c.banco) ? ` (${c.banco_origen || c.banco})` : '';
+          const m = parseFloat(c.monto || 0);
+          return [
+            idx + 1,
+            `${c.fecha || ''}\n${c.hora || ''}`,
+            c.cliente || c.Cliente || 'Sin nombre',
+            c.servicio || '',
+            `${c.estado || 'Pendiente'}${bancoInfo}`,
+            `$${m.toFixed(2)}`
+          ];
+        });
+
+        doc.autoTable({
+          startY: currentY + 4,
+          head: [['#', 'Fecha / Hora', 'Cliente', 'Servicio', 'Estado/Pago', 'Total']],
+          body: tableData,
+          headStyles: { fillColor: [232, 165, 184], textColor: [255, 255, 255], fontStyle: 'bold' },
+          alternateRowStyles: { fillColor: [251, 247, 245] },
+          styles: { fontSize: 8.5, cellPadding: 3 },
+          columnStyles: { 5: { halign: 'right' } }
+        });
+
+        let subtotalY = doc.lastAutoTable.finalY + 6;
+
+        // Recuadro de resumen por chica con su porcentaje dinámico
+        doc.setFillColor(245, 235, 238);
+        doc.roundedRect(14, subtotalY, 182, 10, 2, 2, 'F');
+
+        doc.setFontSize(8.5);
+        doc.setFont('helvetica', 'bold');
+        doc.setTextColor(59, 45, 44);
+        
+        const resumenChicaTexto = `Turnos: ${citasChica.length} | Facturado: $${totalFacturadoChica.toFixed(2)} | PAGO CHICA (${pctTexto}%): $${pagoChica.toFixed(2)}`;
+        doc.text(resumenChicaTexto, 18, subtotalY + 6.5);
+
+        currentY = subtotalY + 18;
+      });
+
+      // Sección Métodos de Pago
+      if (citasSeleccionadas.length > 0) {
+        if (currentY > 210) {
+          doc.addPage();
+          currentY = 20;
+        }
+
+        doc.setFontSize(11);
+        doc.setFont('helvetica', 'bold');
+        doc.setTextColor(55, 48, 163);
+        doc.text("Desglose de Ingresos por Método de Pago / Banco", 14, currentY);
+
+        let totalEfectivo = 0;
+        let totalTarjeta = 0;
+        let totalCompletadoSinEsp = 0;
+        let totalPendiente = 0;
+        const bancosMap = {};
+
+        citasSeleccionadas.forEach(c => {
+          const monto = parseFloat(c.monto || 0);
+          const est = (c.estado || 'Pendiente').toLowerCase();
+          const banco = c.banco_origen || c.banco || 'Sin Especificar';
+
+          if (est === 'efectivo') totalEfectivo += monto;
+          else if (est === 'tarjeta') totalTarjeta += monto;
+          else if (est === 'transferencia') {
+            if (!bancosMap[banco]) bancosMap[banco] = 0;
+            bancosMap[banco] += monto;
+          } else if (est === 'completado') totalCompletadoSinEsp += monto;
+          else totalPendiente += monto;
+        });
+
+        const desgloseRows = [];
+        desgloseRows.push(['Efectivo', 'Pago en físico', `$${totalEfectivo.toFixed(2)}`]);
+        desgloseRows.push(['Tarjeta', 'Datafast / POS', `$${totalTarjeta.toFixed(2)}`]);
+
+        Object.keys(bancosMap).sort().forEach(bancoName => {
+          desgloseRows.push([`Transferencia (${bancoName})`, 'Transferencia Bancaria', `$${bancosMap[bancoName].toFixed(2)}`]);
+        });
+
+        if (totalCompletadoSinEsp > 0) desgloseRows.push(['Completado / Otros', 'Pago registrado sin método específico', `$${totalCompletadoSinEsp.toFixed(2)}`]);
+        if (totalPendiente > 0) desgloseRows.push(['Pendiente por Cobrar', 'Pendiente de confirmación', `$${totalPendiente.toFixed(2)}`]);
+
+        doc.autoTable({
+          startY: currentY + 4,
+          head: [['Método / Banco', 'Tipo de Transacción', 'Monto Acumulado']],
+          body: desgloseRows,
+          headStyles: { fillColor: [99, 102, 241], textColor: [255, 255, 255], fontStyle: 'bold' },
+          alternateRowStyles: { fillColor: [243, 244, 255] },
+          styles: { fontSize: 8.5, cellPadding: 3 },
+          columnStyles: { 2: { halign: 'right', fontStyle: 'bold' } }
+        });
+
+        currentY = doc.lastAutoTable.finalY + 10;
+      }
+
+      // Sección Egresos
+      if (egresosSeleccionados.length > 0) {
+        if (currentY > 210) {
+          doc.addPage();
+          currentY = 20;
+        }
+
+        doc.setFontSize(11);
+        doc.setFont('helvetica', 'bold');
+        doc.setTextColor(225, 29, 72);
+        doc.text("Resumen de Egresos y Compras de Insumos", 14, currentY);
+
+        const egresoRows = egresosSeleccionados.map((e, idx) => [
+          idx + 1,
+          e.fecha || '',
+          e.categoria || 'Gasto',
+          e.cantidad || 1,
+          e.notas || '-',
+          `$${parseFloat(e.monto || 0).toFixed(2)}`
+        ]);
+
+        doc.autoTable({
+          startY: currentY + 4,
+          head: [['#', 'Fecha', 'Categoría', 'Cant.', 'Notas', 'Costo']],
+          body: egresoRows,
+          headStyles: { fillColor: [225, 29, 72], textColor: [255, 255, 255], fontStyle: 'bold' },
+          alternateRowStyles: { fillColor: [255, 245, 245] },
+          styles: { fontSize: 8.5, cellPadding: 3 },
+          columnStyles: { 5: { halign: 'right', fontStyle: 'bold' } }
+        });
+
+        currentY = doc.lastAutoTable.finalY + 10;
+      }
+
+      if (currentY > 220) {
+        doc.addPage();
+        currentY = 20;
+      }
+
+      // Recuadro Final Pie de Página
+      let totalMontoRecaudado = citasSeleccionadas.reduce((sum, c) => sum + (parseFloat(c.monto) || 0), 0);
+      let totalEgresos = egresosSeleccionados.reduce((sum, e) => sum + (parseFloat(e.monto) || 0), 0);
+      let gananciaFinalStudio = totalMontoRecaudado - totalAcumuladoPagoChicas - totalEgresos;
+
+      doc.setFillColor(245, 235, 234);
+      doc.roundedRect(14, currentY, 182, 28, 3, 3, 'F');
+
+      doc.setFontSize(9.5);
+      doc.setFont('helvetica', 'bold');
+      doc.setTextColor(59, 45, 44);
+      doc.text(`TOTAL RECAUDADO: $${totalMontoRecaudado.toFixed(2)}  (${citasSeleccionadas.length} turnos)`, 18, currentY + 8);
+
+      doc.setTextColor(190, 24, 93);
+      doc.text(`Pago Chicas: $${totalAcumuladoPagoChicas.toFixed(2)}`, 18, currentY + 16);
+      doc.text(`Total Egresos: $${totalEgresos.toFixed(2)}`, 110, currentY + 16);
+
+      doc.setTextColor(59, 45, 44);
+      doc.text(`GANANCIA FINAL STUDIO: $${gananciaFinalStudio.toFixed(2)}`, 18, currentY + 24);
+
+      doc.save(`${nombreArchivo}.pdf`);
+      showToast('Reporte PDF descargado con éxito', 'success');
+    }
+
+    // --- ACCIONES DE BOTONES DE DESCARGA PDF ---
+    function descargarPDF(modo) {
+      let targetFecha = (modo === 'hoy') ? hoyStr : document.getElementById('fechaPdf').value;
+      if (!targetFecha) {
+        showToast('Por favor selecciona una fecha válida.', 'warning');
+        return;
+      }
+
+      const citasDia = citasGlobales.filter(c => c.fecha === targetFecha);
+      const egresosDia = egresosGlobales.filter(e => e.fecha === targetFecha);
+      generarPDFGenerico(citasDia, egresosDia, 'Reporte Diario de Turnos y Egresos', `Fecha: ${targetFecha}`, `Turnos_Dia_${targetFecha}`);
+    }
+
+    function descargarPDFSemana() {
+      const targetFecha = document.getElementById('fechaPdf').value || hoyStr;
+      const refDate = new Date(targetFecha + 'T00:00:00');
+      
+      const dayOfWeek = refDate.getDay(); 
+      const diffToMon = dayOfWeek === 0 ? -6 : 1 - dayOfWeek;
+      
+      const inicioSemana = new Date(refDate);
+      inicioSemana.setDate(refDate.getDate() + diffToMon);
+      
+      const finSemana = new Date(inicioSemana);
+      finSemana.setDate(inicioSemana.getDate() + 6);
+
+      const strInicio = inicioSemana.toISOString().split('T')[0];
+      const strFin = finSemana.toISOString().split('T')[0];
+
+      const citasSemana = citasGlobales.filter(c => c.fecha >= strInicio && c.fecha <= strFin);
+      const egresosSemana = egresosGlobales.filter(e => e.fecha >= strInicio && e.fecha <= strFin);
+      generarPDFGenerico(citasSemana, egresosSemana, 'Reporte Semanal de Turnos y Egresos', `${strInicio} al ${strFin}`, `Turnos_Semana_${strInicio}_al_${strFin}`);
+    }
+
+    function descargarPDFMes() {
+      const targetFecha = document.getElementById('fechaPdf').value || hoyStr;
+      const [year, month] = targetFecha.split('-');
+
+      const ultimoDia = new Date(parseInt(year, 10), parseInt(month, 10), 0).getDate();
+      const fechaInicio = `${year}-${month}-01`;
+      const fechaFin = `${year}-${month}-${String(ultimoDia).padStart(2, '0')}`;
+
+      const citasMes = citasGlobales.filter(c => c.fecha && c.fecha >= fechaInicio && c.fecha <= fechaFin);
+      const egresosMes = egresosGlobales.filter(e => e.fecha && e.fecha >= fechaInicio && e.fecha <= fechaFin);
+
+      generarPDFGenerico(citasMes, egresosMes, 'Reporte Mensual de Turnos y Egresos', `Mes: ${year}-${month} (${fechaInicio} al ${fechaFin})`, `Turnos_Mes_${year}_${month}`);
+    }
+
+    document.getElementById('btnPdfHoy').addEventListener('click', () => descargarPDF('hoy'));
+    document.getElementById('btnPdfFecha').addEventListener('click', () => descargarPDF('fecha'));
+    document.getElementById('btnPdfSemana').addEventListener('click', descargarPDFSemana);
+    document.getElementById('btnPdfMes').addEventListener('click', descargarPDFMes);
+
+    cargarCitas();
+    cargarEgresos();
+  });
+</script>
+
+</body>
+</html>
